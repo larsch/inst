@@ -93,12 +93,14 @@ class Base
       httpget(uri) do |response|
         filename = File.basename(uri.path)
         temppath = File.join(Temp, filename)
-        File.open(temppath, "wb") do |f|
-          bytes_downloaded = 0
-          response.read_body do |fragment|
-            f.write(fragment)
-            bytes_downloaded += fragment.size
-            print "\r#{bytes_downloaded}/#{response.content_length}"
+	if not File.exist?(temppath)
+          File.open(temppath, "wb") do |f|
+            bytes_downloaded = 0
+            response.read_body do |fragment|
+              f.write(fragment)
+              bytes_downloaded += fragment.size
+              print "\r#{bytes_downloaded}/#{response.content_length}"
+            end
           end
         end
       end
