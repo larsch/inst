@@ -9,13 +9,17 @@ class Base
   Temp = ENV['TEMP']
   ToolBinaryPath = File.join(ProgramFiles, "tools", "bin")
 
+  def dospath(path)
+    path.tr('/','\\')
+  end
+
   def randstr
     [rand(2**64)].pack("Q").unpack("h*")
   end
 
   def with_temppath
     path = File.join(Temp, randstr)
-
+    
     dir = Dir.pwd
     begin
       mkdir(path)
@@ -72,10 +76,7 @@ class Base
   
   def get(url)
     temppath = nil
-
     uri = URI.parse(url)
-    p uri.scheme
-
     case uri.scheme
     when 'ftp'
       filename = File.basename(uri.path)
@@ -93,7 +94,7 @@ class Base
       httpget(uri) do |response|
         filename = File.basename(uri.path)
         temppath = File.join(Temp, filename)
-	if not File.exist?(temppath)
+	#if not File.exist?(temppath)
           File.open(temppath, "wb") do |f|
             bytes_downloaded = 0
             response.read_body do |fragment|
@@ -102,7 +103,7 @@ class Base
               print "\r#{bytes_downloaded}/#{response.content_length}"
             end
           end
-        end
+        #end
       end
       
     end

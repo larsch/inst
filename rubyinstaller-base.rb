@@ -1,6 +1,3 @@
-@name = "ruby"
-@version = "1.8.6-p383-rc1"
-
 def install
   get URL do |path|
     system path.tr('/','\\'), "/DIR=#{dospath Destination}", "/VERYSILENT"
