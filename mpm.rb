@@ -2,6 +2,36 @@ require 'net/http'
 require 'net/ftp'
 require 'fileutils'
 
+class ProgressBar
+  PAINT_INTERVAL = 0.25
+  
+  def initialize(max)
+    @max = max
+    @prg = 0
+    @last_paint = Time.now - 60
+    paint
+    yield(self)
+    puts
+  end
+
+  def inc(count)
+    @prg += count
+    paint if (Time.now > @last_paint + PAINT_INTERVAL) or @prg >= @max
+  end
+
+  def paint
+    w = 77
+    pct = (@prg * 100.0 / @max).round
+    n = (@prg * w + (w/2-1)) / @max
+    printf "\r%3d%%[" +
+      "=" * ([n-1,0].max) +
+      ">" * ((n > 0 || n < w-1) ? 1 : 0) + 
+      "-" * (w-n) +
+      "]#{@prg}/#{@max}", pct
+    @last_paint = Time.now
+  end
+end
+
 class Base
   include FileUtils
 
@@ -94,16 +124,19 @@ class Base
       httpget(uri) do |response|
         filename = File.basename(uri.path)
         temppath = File.join(Temp, filename)
-	#if not File.exist?(temppath)
+
+        ProgressBar.new(response.content_length) do |pb|
+          #if not File.exist?(temppath)
           File.open(temppath, "wb") do |f|
             bytes_downloaded = 0
             response.read_body do |fragment|
               f.write(fragment)
+              pb.inc(fragment.size)
               bytes_downloaded += fragment.size
-              print "\r#{bytes_downloaded}/#{response.content_length}"
             end
           end
-        #end
+          #end
+        end
       end
       
     end
@@ -111,6 +144,12 @@ class Base
     if temppath
       yield(temppath)
     end
+  end
+
+  def unzip(zipfile, targetpath)
+    mkdir_p targetpath
+    puts "Unzipping #{File.basename(zipfile)} to #{targetpath}"
+    system 'unzip', '-q', '-o', zipfile, '-d', targetpath
   end
 end
 
