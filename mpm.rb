@@ -1,6 +1,7 @@
 require 'net/http'
 require 'net/ftp'
 require 'fileutils'
+require 'cgi'
 
 class String
   def /(n)
@@ -128,7 +129,15 @@ class Base
 
     when 'http'
       httpget(uri) do |response|
-        filename = File.basename(uri.path)
+        filename = nil
+        if contentdisp = response["Content-Disposition"]
+          token = /([^()<>@,;:\\\"\/\[\]?={} ]*)/
+          qstring = /"([^\"]|\\")*"/
+          if contentdisp =~ /filename=(#{token}|#{qstring})/
+              filename = $2 || CGI::unescape($3)
+          end
+        end
+        filename ||= File.basename(uri.path)
         temppath = File.join(Temp, filename)
 
         ProgressBar.new(response.content_length) do |pb|
