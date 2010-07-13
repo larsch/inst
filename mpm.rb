@@ -2,6 +2,12 @@ require 'net/http'
 require 'net/ftp'
 require 'fileutils'
 
+class String
+  def /(n)
+    File.join(self, n)
+  end
+end
+
 class ProgressBar
   PAINT_INTERVAL = 0.25
   
@@ -150,6 +156,11 @@ class Base
     mkdir_p targetpath
     puts "Unzipping #{File.basename(zipfile)} to #{targetpath}"
     system 'unzip', '-q', '-o', zipfile, '-d', targetpath
+  end
+
+  def system(*args)
+    puts args.join(" ")
+    Kernel.system(*args)
   end
 end
 
