@@ -119,11 +119,13 @@ class Base
       filename = File.basename(uri.path)
       temppath = File.join(Temp, filename)
       bytes_downloaded = 0
-      File.open(temppath, "wb") do |f|
-        ftpget(uri) do |content_length, fragment|
-          f.write(fragment)
-          bytes_downloaded += fragment.size
-          print "\r#{bytes_downloaded}/#{content_length}"
+      if not File.exist?(temppath)
+        File.open(temppath, "wb") do |f|
+          ftpget(uri) do |content_length, fragment|
+            f.write(fragment)
+            bytes_downloaded += fragment.size
+            print "\r#{bytes_downloaded}/#{content_length}"
+          end
         end
       end
 
