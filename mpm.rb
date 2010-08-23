@@ -27,14 +27,14 @@ class ProgressBar
   end
 
   def paint
-    w = 77
+    w = 70
     pct = (@prg * 100.0 / @max).round
     n = (@prg * w + (w/2-1)) / @max
     printf "\r%3d%%[" +
       "=" * ([n-1,0].max) +
       ">" * ((n > 0 || n < w-1) ? 1 : 0) + 
       "-" * (w-n) +
-      "]#{@prg}/#{@max}", pct
+      "]", pct
     @last_paint = Time.now
   end
 end
@@ -176,5 +176,5 @@ class Base
 end
 
 cls = Class.new(Base)
-cls.class_eval(IO.read(ARGV[1]))
+cls.class_eval(IO.read(ARGV[1]), ARGV[1])
 cls.new.send(ARGV[0])
