@@ -2,6 +2,7 @@ require 'net/http'
 require 'net/ftp'
 require 'fileutils'
 require 'cgi'
+require 'nokogiri' rescue nil
 
 class String
   def /(n)
@@ -39,8 +40,23 @@ class ProgressBar
   end
 end
 
+module Tasks
+  def actions
+    @actions ||= {}
+  end
+  
+  def install(&block)
+    self.actions[:install] = block
+  end
+  def uninstall(&block)
+    self.actions[:uninstall] = block
+  end
+end
+
 class Base
   include FileUtils
+  include Tasks
+  include Nokogiri if defined?(Nokogiri)
 
   ProgramFiles = "C:/appl"
   Temp = ENV['TEMP']
@@ -175,6 +191,6 @@ class Base
   end
 end
 
-cls = Class.new(Base)
-cls.class_eval(IO.read(ARGV[1]), ARGV[1])
-cls.new.send(ARGV[0])
+obj = Base.new
+obj.instance_eval(IO.read(ARGV[1]), ARGV[1])
+obj.actions[ARGV[0].to_sym].call
