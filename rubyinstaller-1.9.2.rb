@@ -8,7 +8,7 @@ download_page = 'http://rubyinstaller.org/downloads/'
 
 install do
   get URL do |path|
-    system path.tr('/','\\'), "/DIR=#{dospath Destination}", "/VERYSILENT"
+    system dospath(path), "/DIR=#{dospath Destination}", "/VERYSILENT"
   end
 end
 

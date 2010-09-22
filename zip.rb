@@ -1,12 +1,12 @@
-URL = "ftp://ftp.info-zip.org/pub/infozip/win32/zip232xn.zip"
-Destination = File.join(ProgramFiles, "tools", "bin")
-def install
-  get URL do |path|
+url = "ftp://ftp.info-zip.org/pub/infozip/win32/zip232xn.zip"
+destination = ToolBinaryPath
+install do
+  get url do |path|
     with_temppath do
       system "unzip", path
-      mkdir_p Destination
+      mkdir_p destination
       Dir["*.exe"].each do |exe|
-        cp exe, Destination
+        cp exe, destination
       end
     end
   end

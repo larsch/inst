@@ -11,12 +11,15 @@ class String
 end
 
 class ProgressBar
-  PAINT_INTERVAL = 0.25
+  UPDATE_INTERVAL = 0.25
+  WIDTH = 72
   
   def initialize(max)
     @max = max
     @prg = 0
-    @last_paint = Time.now - 60
+    @last_fully = -1
+    @last_partially = -1
+    @last_time = Time.now
     paint
     yield(self)
     puts
@@ -24,20 +27,28 @@ class ProgressBar
 
   def inc(count)
     @prg += count
-    paint if (Time.now > @last_paint + PAINT_INTERVAL) or @prg >= @max
+    paint
   end
 
   def paint
-    w = 70
+    width = WIDTH - 2
     pct = (@prg * 100.0 / @max).round
-    n = (@prg * w + (w/2-1)) / @max
-    printf "\r%3d%%[" +
-      "=" * ([n-1,0].max) +
-      ">" * ((n > 0 || n < w-1) ? 1 : 0) + 
-      "-" * (w-n) +
-      "]", pct
-    @last_paint = Time.now
+    progress = [@prg, @max].min
+    finished = progress / @max.to_f * width
+    fully = finished.floor
+    partially = (finished - fully > 0.001 ? 1 : 0)
+    now = Time.now
+    if fully != @last_fully or partially != @last_partially or now - @last_time > UPDATE_INTERVAL
+      rest = width - partially - fully
+      printf "\r%3d%% [" + "=" * fully + ">" * partially + "-" * rest + "]", pct
+      @last_fully = fully
+      @last_partially = partially
+      @last_time = now
+    end
   end
+end
+def ProgressBar(max, &block)
+  ProgressBar.new(max, &block)
 end
 
 module Tasks
@@ -61,6 +72,10 @@ class Base
   ProgramFiles = "C:/appl"
   Temp = ENV['TEMP']
   ToolBinaryPath = File.join(ProgramFiles, "tools", "bin")
+
+  def initialize
+    @cache_enabled = false
+  end
 
   def dospath(path)
     path.tr('/','\\')
@@ -116,18 +131,21 @@ class Base
     Net::FTP.open(uri.host) do |ftp|
       print "\rlogging in..."
       ftp.login
-      print "\rchdir..."
+      print "\rchdir...     "
       ftp.chdir(File.dirname(uri.path))
-      print "\rsize..."
+      print "\rsize...      "
       content_length = ftp.size(File.basename(uri.path))
-      print "\rget..."
-      ftp.getbinaryfile(File.basename(uri.path)) do |fragment|
-        yield(content_length, fragment)
+      print "\rget...       "
+      ProgressBar content_length do |pb|
+        ftp.retrbinary("RETR " + File.basename(uri.path), 8192) do |fragment|
+          pb.inc fragment.size
+          yield fragment
+        end
       end
     end
   end
   
-  def get(url)
+  def get(url, options = {})
     temppath = nil
     uri = URI.parse(url)
     case uri.scheme
@@ -135,12 +153,10 @@ class Base
       filename = File.basename(uri.path)
       temppath = File.join(Temp, filename)
       bytes_downloaded = 0
-      if not File.exist?(temppath)
-        File.open(temppath, "wb") do |f|
-          ftpget(uri) do |content_length, fragment|
-            f.write(fragment)
-            bytes_downloaded += fragment.size
-            print "\r#{bytes_downloaded}/#{content_length}"
+      if not File.exist?(temppath) or not @cache_enabled
+        File.open temppath, "wb" do |f|
+          ftpget uri do |fragment|
+            f.write fragment
           end
         end
       end
@@ -151,36 +167,42 @@ class Base
         if contentdisp = response["Content-Disposition"]
           token = /([^()<>@,;:\\\"\/\[\]?={} ]*)/
           qstring = /"([^\"]|\\")*"/
-          if contentdisp =~ /filename=(#{token}|#{qstring})/
+          if contentdisp =~ /filename=\"?(#{token}|#{qstring})\"?/
               filename = $2 || CGI::unescape($3)
           end
         end
         filename ||= File.basename(uri.path)
         temppath = File.join(Temp, filename)
 
-        ProgressBar.new(response.content_length) do |pb|
-          #if not File.exist?(temppath)
-          File.open(temppath, "wb") do |f|
+        ProgressBar response.content_length do |pb|
+          if not File.exist?(temppath) or not @cache_enabled
+            File.open(temppath, "wb") do |f|
             bytes_downloaded = 0
-            response.read_body do |fragment|
-              f.write(fragment)
-              pb.inc(fragment.size)
-              bytes_downloaded += fragment.size
+              response.read_body do |fragment|
+                f.write(fragment)
+                pb.inc(fragment.size)
+                bytes_downloaded += fragment.size
+              end
             end
           end
-          #end
         end
       end
       
     end
 
     if temppath
+      if sha1 = options[sha1]
+        require 'digest/sha1'
+        raise "Checksum failure" unless Digest::SHA1.file(temppath) == sha1.downcase
+      end
       yield(temppath)
     end
   end
 
   def unzip(zipfile, targetpath)
     mkdir_p targetpath
+    targetpath = dospath(targetpath)
+    zipfile = dospath(zipfile)
     puts "Unzipping #{File.basename(zipfile)} to #{targetpath}"
     system 'unzip', '-q', '-o', zipfile, '-d', targetpath
   end
@@ -191,6 +213,16 @@ class Base
   end
 end
 
+if ARGV.empty?
+  print DATA.read
+  exit
+end
+
 obj = Base.new
 obj.instance_eval(IO.read(ARGV[1]), ARGV[1])
 obj.actions[ARGV[0].to_sym].call
+__END__
+Usage: mpm.rb <command> <package>
+
+  mpm install <package>
+  mpm uninstall <package>

@@ -1,11 +1,11 @@
-URL = "http://windirstat.info/wds_current_setup.exe"
-InstallPath = ProgramFiles / "WinDirStat"
-Uninstaller = InstallPath / "Uninstall.exe"
-def install
-  get URL do |path|
+url = "http://windirstat.info/wds_current_setup.exe"
+destination = ProgramFiles / "WinDirStat"
+uninstaller = InstallPath / "Uninstall.exe"
+install do
+  get url do |path|
     system path, "/S", "/D=#{dospath InstallPath}"
   end
 end
-def uninstall
-  system Uninstaller, "/S"
+uninstall do
+  system uninstaller, "/S"
 end
