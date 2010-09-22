@@ -214,15 +214,15 @@ class Base
 end
 
 if ARGV.empty?
-  print DATA.read
+  puts <<END_OF_USAGE
+Usage: mpm.rb <command> <package>
+
+  mpm install <package>
+  mpm uninstall <package>
+END_OF_USAGE
   exit
 end
 
 obj = Base.new
 obj.instance_eval(IO.read(ARGV[1]), ARGV[1])
 obj.actions[ARGV[0].to_sym].call
-__END__
-Usage: mpm.rb <command> <package>
-
-  mpm install <package>
-  mpm uninstall <package>
