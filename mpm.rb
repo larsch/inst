@@ -12,7 +12,7 @@ end
 
 class ProgressBar
   UPDATE_INTERVAL = 0.25
-  WIDTH = 72
+  WIDTH = 68
   
   def initialize(max)
     @max = max
@@ -210,6 +210,26 @@ class Base
   def system(*args)
     puts args.join(" ")
     Kernel.system(*args)
+  end
+
+  def scrape(url)
+    require 'open-uri'
+    require 'nokogiri'
+    content = nil
+    open(url) do |io|
+      content = io.read
+    end
+    yield(Nokogiri::HTML.parse(content))
+  end
+
+  def scrape_xml(url)
+    require 'open-uri'
+    require 'nokogiri'
+    content = nil
+    open(url) do |io|
+      content = io.read
+    end
+    yield(Nokogiri::XML.parse(content))
   end
 end
 
