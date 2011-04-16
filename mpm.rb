@@ -2,7 +2,10 @@ require 'net/http'
 require 'net/ftp'
 require 'fileutils'
 require 'cgi'
-require 'nokogiri' rescue nil
+begin
+  require 'nokogiri'
+rescue LoadError
+end
 
 class String
   def /(n)
@@ -147,7 +150,7 @@ class Base
   
   def get(url, options = {})
     temppath = nil
-    uri = URI.parse(url)
+    uri = url.is_a?(URI) ? url : URI.parse(url)
     case uri.scheme
     when 'ftp'
       filename = File.basename(uri.path)

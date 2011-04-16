@@ -1,19 +1,20 @@
 require 'open-uri'
 
-URL = "http://rubyforge.org/frs/download.php/72170/rubyinstaller-1.9.2-p0.exe"
-@name = File.basename(URL).gsub(/\.exe$/, '')
-@version = @name[/rubyinstaller-(.*)/, 1]
-Destination = Base::ProgramFiles / @name
+url = "http://rubyforge.org/frs/download.php/74298/rubyinstaller-1.9.2-p180.exe"
+name = File.basename(url).gsub(/\.exe$/, '')
+version = name[/rubyinstaller-(.*)/, 1]
+destination = Base::ProgramFiles / name
 download_page = 'http://rubyinstaller.org/downloads/'
 
 install do
-  get URL do |path|
-    system dospath(path), "/DIR=#{dospath Destination}", "/VERYSILENT"
+  get url do |path|
+    # system "\"#{dospath path}\" /TASKS=\"MODPATH,ASSOCFILES\" /DIR=\"#{dospath destination}\""
+    system dospath(path), "/TASKS=\"MODPATH,ASSOCFILES\"", "/DIR=\"#{dospath destination}\""
   end
 end
 
 uninstall do
-  uninstaller = Dir["#{Destination}/unins*.exe"][0]
+  uninstaller = Dir["#{destination}/unins*.exe"][0]
   if uninstaller
     system uninstaller, "/VERYSILENT"
   end
