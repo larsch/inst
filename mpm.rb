@@ -2,6 +2,9 @@ require 'net/http'
 require 'net/ftp'
 require 'fileutils'
 require 'cgi'
+require 'time'
+require 'ostruct'
+
 begin
   require 'nokogiri'
 rescue LoadError
@@ -58,7 +61,6 @@ module Tasks
   def actions
     @actions ||= {}
   end
-  
   def install(&block)
     self.actions[:install] = block
   end
@@ -72,12 +74,29 @@ class Base
   include Tasks
   include Nokogiri if defined?(Nokogiri)
 
+  attr_reader :registry
+
   ProgramFiles = "C:/appl"
   Temp = ENV['TEMP']
   ToolBinaryPath = File.join(ProgramFiles, "tools", "bin")
 
   def initialize
     @cache_enabled = false
+    @registry = OpenStruct.new
+  end
+
+  def load_registry(basename)
+    registry_path = File.expand_path("~/.instregistry/" + basename)
+    if File.file?(registry_path)
+      content = File.open(registry_path, "rb") { |io| io.read }
+      @registry = Marshal.load(content)
+    end
+  end
+
+  def save_registry(basename)
+    registry_path = File.expand_path("~/.instregistry/" + basename)
+    mkdir_p File.dirname(registry_path)
+    File.open(registry_path, "wb") { |io| io.write(Marshal.dump(@registry)) }
   end
 
   def dospath(path)
@@ -110,13 +129,22 @@ class Base
       @url
     end
   end
+
+  class NotModified < Exception
+  end
   
-  def httpget(uri)
+  def httpget(uri, opt = {})
+    request_headers = {}
+    if if_modified_since = opt[:if_modified_since]
+      request_headers["If-Modified-Since"] = if_modified_since.httpdate
+    end
     begin
       puts uri
       Net::HTTP.start(uri.host, uri.port) do |http|
-        http.request_get(uri.request_uri) do |response|
+        http.request_get(uri.request_uri, request_headers) do |response|
           case response
+          when Net::HTTPNotModified
+            raise NotModified
           when Net::HTTPRedirection
             raise Redirection, response['Location']
           else
@@ -149,6 +177,7 @@ class Base
   end
   
   def get(url, options = {})
+    response_options = OpenStruct.new
     temppath = nil
     uri = url.is_a?(URI) ? url : URI.parse(url)
     case uri.scheme
@@ -165,8 +194,11 @@ class Base
       end
 
     when 'http'
-      httpget(uri) do |response|
+      httpget(uri, if_modified_since: options[:if_modified_since]) do |response|
         filename = nil
+        if last_modified = response['Last-Modified']
+          response_options.last_modified = Time.parse(last_modified)
+        end
         if contentdisp = response["Content-Disposition"]
           token = /([^()<>@,;:\\\"\/\[\]?={} ]*)/
           qstring = /"([^\"]|\\")*"/
@@ -190,15 +222,14 @@ class Base
           end
         end
       end
-      
     end
 
     if temppath
-      if sha1 = options[sha1]
+      if sha1 = options[:sha1]
         require 'digest/sha1'
         raise "Checksum failure" unless Digest::SHA1.file(temppath) == sha1.downcase
       end
-      yield(temppath)
+      yield(temppath, response_options)
     end
   end
 
@@ -236,6 +267,10 @@ class Base
   end
 end
 
+def registry
+  @registry
+end
+
 if ARGV.empty?
   puts <<END_OF_USAGE
 Usage: mpm.rb <command> <package>
@@ -247,5 +282,7 @@ END_OF_USAGE
 end
 
 obj = Base.new
+obj.load_registry(ARGV[1])
 obj.instance_eval(IO.read(ARGV[1]), ARGV[1])
 obj.actions[ARGV[0].to_sym].call
+obj.save_registry(ARGV[1])
